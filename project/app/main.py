@@ -1,7 +1,4 @@
-# project/app/main.py
-
-from fastapi import FastAPI, Depends
-
+from fastapi import FastAPI
 
 app = FastAPI()
 

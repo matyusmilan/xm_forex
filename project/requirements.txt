@@ -1,9 +1,0 @@
-fastapi
-uvicorn
-httpx
-pytest
-flake8
-black
-bandit
-isort
-safety

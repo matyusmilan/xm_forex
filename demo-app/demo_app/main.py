@@ -2,7 +2,8 @@ import time
 from typing import Sequence
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, Depends, Query
+from fastapi import FastAPI, HTTPException, Depends, Query, WebSocket, WebSocketDisconnect
+from websockets.exceptions import ConnectionClosed
 from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
 from fastapi.openapi.utils import get_openapi
 from starlette import status
@@ -170,3 +171,26 @@ async def delete_order(*, session: Session = Depends(get_session), order_id: str
 )
 async def health_check():
     return {"message": "OK"}
+
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    # await for connections
+    await websocket.accept()
+
+    try:
+        # send "Connection established" message to client
+        await websocket.send_text("Connection established!")
+
+        # await for messages and send messages
+        while True:
+            msg = await websocket.receive_text()
+            if msg.lower() == "close":
+                await websocket.close()
+                break
+            else:
+                print(f'CLIENT says - {msg}')
+                await websocket.send_text(f"Your message was: {msg}")
+
+    except (WebSocketDisconnect, ConnectionClosed):
+        print("Client disconnected")

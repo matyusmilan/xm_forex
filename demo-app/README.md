@@ -73,3 +73,15 @@ docker run -it demo_app:test safety check
 docker run -it demo_app:test pytest --html=tests/reports/report.html --cov=demo_app tests/ -v
 ```
 # Technology
+
+## API
+- FastAPI - https://fastapi.tiangolo.com/
+- SXLModel - https://sqlmodel.tiangolo.com/
+
+## Testing
+- pytest - https://docs.pytest.org/
+
+## Environment
+- Poetry - https://python-poetry.org/
+- Docker - https://www.docker.com/
+

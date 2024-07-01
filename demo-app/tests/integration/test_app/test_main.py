@@ -13,6 +13,10 @@ NOT_A_NUMER = "not-a-number"
 DEFAULT_ORDER_STATUS = OrderStatus.PENDING
 
 
+def mock_delay():
+    pass
+
+
 @pytest.fixture(name="session")
 def session_fixture():
     engine = create_engine(
@@ -45,7 +49,8 @@ def test_health_check(client: TestClient):
     assert response.json() == {"message": "OK"}
 
 
-def test_place_order(client: TestClient):
+def test_place_order(client: TestClient, monkeypatch):
+    monkeypatch.setattr("demo_app.main.delay", mock_delay)
     response = client.post("/orders/", json={"stoks": "EURUSD", "quantity": 66.6})
     data = response.json()
 
@@ -56,7 +61,8 @@ def test_place_order(client: TestClient):
     assert data["status"] == OrderStatus.EXECUTED
 
 
-def test_place_order_incomplete(client: TestClient):
+def test_place_order_incomplete(client: TestClient, monkeypatch):
+    monkeypatch.setattr("demo_app.main.delay", mock_delay)
     response = client.post("/orders/", json={"stoks": "EURUSD"})
     data = response.json()
     assert response.status_code == 422
@@ -80,14 +86,16 @@ def test_place_order_incomplete(client: TestClient):
         ),
     ],
 )
-def test_place_order_invalid(client: TestClient, stoks, quantity, error_msg):
+def test_place_order_invalid(client: TestClient, stoks, quantity, error_msg, monkeypatch):
+    monkeypatch.setattr("demo_app.main.delay", mock_delay)
     response = client.post("/orders/", json={"stoks": stoks, "quantity": quantity})
     assert response.status_code == 422
     data = response.json()
     assert data['detail'][0]['msg'] == error_msg
 
 
-def test_get_orders(session: Session, client: TestClient):
+def test_get_orders(session: Session, client: TestClient, monkeypatch):
+    monkeypatch.setattr("demo_app.main.delay", mock_delay)
     order_input_1 = OrderInput(stoks="USDCHF", quantity="1234")
     order_input_2 = OrderInput(stoks="EURGBP", quantity="12.34")
     db_order_1 = Order.model_validate(order_input_1)
@@ -114,7 +122,8 @@ def test_get_orders(session: Session, client: TestClient):
     assert data[1]["id"] is not None
 
 
-def test_get_orders_empty(client: TestClient):
+def test_get_orders_empty(client: TestClient, monkeypatch):
+    monkeypatch.setattr("demo_app.main.delay", mock_delay)
     response = client.get("/orders/")
     data = response.json()
 
@@ -122,7 +131,8 @@ def test_get_orders_empty(client: TestClient):
     assert len(data) == 0
 
 
-def test_get_order(session: Session, client: TestClient):
+def test_get_order(session: Session, client: TestClient, monkeypatch):
+    monkeypatch.setattr("demo_app.main.delay", mock_delay)
     order_input_1 = OrderInput(stoks="USDUSD", quantity="0")
     db_order_1 = Order.model_validate(order_input_1)
     session.add(db_order_1)
@@ -140,7 +150,8 @@ def test_get_order(session: Session, client: TestClient):
     assert data["quantity"] == db_order_1.quantity
 
 
-def test_get_order_empty(client: TestClient):
+def test_get_order_empty(client: TestClient, monkeypatch):
+    monkeypatch.setattr("demo_app.main.delay", mock_delay)
     response = client.get(f"/orders/1")
     data = response.json()
 
@@ -157,7 +168,8 @@ def test_get_order_type_error(client: TestClient):
     assert data['detail'][0]['msg'] == 'Input should be a valid integer, unable to parse string as an integer'
 
 
-def test_get_order_non_exist_id(session: Session, client: TestClient):
+def test_get_order_non_exist_id(session: Session, client: TestClient, monkeypatch):
+    monkeypatch.setattr("demo_app.main.delay", mock_delay)
     order_input_1 = OrderInput(stoks="USDCHF", quantity="1234567")
     db_order_1 = Order.model_validate(order_input_1)
     session.add(db_order_1)
@@ -171,7 +183,8 @@ def test_get_order_non_exist_id(session: Session, client: TestClient):
     assert data['detail'] == 'Order not found'
 
 
-def test_delete_order(session: Session, client: TestClient):
+def test_delete_order(session: Session, client: TestClient, monkeypatch):
+    monkeypatch.setattr("demo_app.main.delay", mock_delay)
     order_1 = Order(id=1, status=OrderStatus.PENDING, stoks="USDCHF", quantity="1234")
     session.add(order_1)
     session.commit()
@@ -186,7 +199,8 @@ def test_delete_order(session: Session, client: TestClient):
     assert order_in_db.stoks == order_1.stoks
 
 
-def test_delete_order_non_exist_id(session: Session, client: TestClient):
+def test_delete_order_non_exist_id(session: Session, client: TestClient, monkeypatch):
+    monkeypatch.setattr("demo_app.main.delay", mock_delay)
     order_1 = Order(id=1, status=OrderStatus.PENDING, stoks="USDCHF", quantity="1234")
     session.add(order_1)
     session.commit()

@@ -31,14 +31,12 @@ WORKDIR /demo-app
 
 COPY ./poetry.lock ./pyproject.toml README.md /demo-app/
 
-FROM base AS service
-# Project initialization:
-RUN poetry install --without dev --no-interaction --no-ansi
-COPY ./demo_app /demo-app/demo_app
-ENTRYPOINT ["uvicorn", "demo_app.main:app", "--reload", "--workers", "1", "--host", "0.0.0.0", "--port", "8000"]
-
 FROM base AS test
-# Project initialization:
 RUN poetry install --no-interaction --no-ansi
 COPY ./demo_app /demo-app/demo_app
 COPY ./tests /demo-app/tests
+
+FROM base AS service
+RUN poetry install --without dev --no-interaction --no-ansi
+COPY ./demo_app /demo-app/demo_app
+ENTRYPOINT ["uvicorn", "demo_app.main:app", "--reload", "--workers", "1", "--host", "0.0.0.0", "--port", "8000"]

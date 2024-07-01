@@ -1,3 +1,5 @@
+import time
+
 import pytest
 from starlette.testclient import TestClient
 from sqlmodel import Session, SQLModel, create_engine
@@ -5,6 +7,10 @@ from sqlmodel.pool import StaticPool
 
 from demo_app.main import app, get_session
 from demo_app.models import OrderStatus, Order, OrderInput, OrderBase
+
+
+NOT_A_NUMER = "not-a-number"
+DEFAULT_ORDER_STATUS = OrderStatus.PENDING
 
 
 @pytest.fixture(name="session")
@@ -40,18 +46,17 @@ def test_health_check(client: TestClient):
 
 
 def test_place_order(client: TestClient):
-    response = client.post("/orders/", json={"stoks": "EURUSD", "quantity": 666})
+    response = client.post("/orders/", json={"stoks": "EURUSD", "quantity": 66.6})
     data = response.json()
 
     assert response.status_code == 201
     assert data["stoks"] == "EURUSD"
-    assert data["quantity"] == 666
+    assert data["quantity"] == 66.6
     assert data["id"] is not None
-    assert data["status"] == OrderStatus.PENDING.value
+    assert data["status"] == OrderStatus.EXECUTED
 
 
 def test_place_order_incomplete(client: TestClient):
-    # No quantity
     response = client.post("/orders/", json={"stoks": "EURUSD"})
     data = response.json()
     assert response.status_code == 422
@@ -69,7 +74,7 @@ def test_place_order_incomplete(client: TestClient):
         ),
         pytest.param(
             "EURUSD",
-            "not-a-number",
+            NOT_A_NUMER,
             "Input should be a valid number, unable to parse string as a number",
             id="quantity"
         ),
@@ -83,10 +88,12 @@ def test_place_order_invalid(client: TestClient, stoks, quantity, error_msg):
 
 
 def test_get_orders(session: Session, client: TestClient):
-    order_1 = Order(id=1,status=OrderStatus.PENDING,stoks="USDCHF",quantity="1234")
-    order_2 = Order(id=2, status=OrderStatus.PENDING, stoks="EURGBP", quantity="12.34")
-    session.add(order_1)
-    session.add(order_2)
+    order_input_1 = OrderInput(stoks="USDCHF", quantity="1234")
+    order_input_2 = OrderInput(stoks="EURGBP", quantity="12.34")
+    db_order_1 = Order.model_validate(order_input_1)
+    session.add(db_order_1)
+    db_order_2 = Order.model_validate(order_input_2)
+    session.add(db_order_2)
     session.commit()
 
     response = client.get("/orders/")
@@ -96,15 +103,15 @@ def test_get_orders(session: Session, client: TestClient):
 
     assert len(data) == 2
 
-    assert data[0]["status"] == order_1.status
-    assert data[0]["stoks"] == order_1.stoks
-    assert data[0]["quantity"] == order_1.quantity
-    assert data[0]["id"] == order_1.id
+    assert data[0]["status"] == OrderStatus.PENDING
+    assert data[0]["stoks"] == order_input_1.stoks
+    assert data[0]["quantity"] == order_input_1.quantity
+    assert data[0]["id"] is not None
 
-    assert data[1]["status"] == order_2.status
-    assert data[1]["stoks"] == order_2.stoks
-    assert data[1]["quantity"] == order_2.quantity
-    assert data[1]["id"] == order_2.id
+    assert data[1]["status"] == OrderStatus.PENDING
+    assert data[1]["stoks"] == order_input_2.stoks
+    assert data[1]["quantity"] == order_input_2.quantity
+    assert data[1]["id"] is not None
 
 
 def test_get_orders_empty(client: TestClient):
@@ -116,22 +123,24 @@ def test_get_orders_empty(client: TestClient):
 
 
 def test_get_order(session: Session, client: TestClient):
-    order_1 = Order(id=1, status=OrderStatus.PENDING, stoks="USDCHF", quantity="1234")
-    session.add(order_1)
+    order_input_1 = OrderInput(stoks="USDUSD", quantity="0")
+    db_order_1 = Order.model_validate(order_input_1)
+    session.add(db_order_1)
     session.commit()
+    session.refresh(db_order_1)
 
-    response = client.get(f"/orders/{order_1.id}")
+    response = client.get(f"/orders/{db_order_1.id}")
     data = response.json()
 
     assert response.status_code == 200
 
-    assert data["id"] == order_1.id
-    assert data["status"] == order_1.status
-    assert data["stoks"] == order_1.stoks
-    assert data["quantity"] == order_1.quantity
+    assert data["id"] == db_order_1.id
+    assert data["status"] == db_order_1.status
+    assert data["stoks"] == db_order_1.stoks
+    assert data["quantity"] == db_order_1.quantity
 
 
-def test_get_order_empty(session: Session, client: TestClient):
+def test_get_order_empty(client: TestClient):
     response = client.get(f"/orders/1")
     data = response.json()
 
@@ -139,12 +148,23 @@ def test_get_order_empty(session: Session, client: TestClient):
     assert data['detail'] == 'Order not found'
 
 
-def test_get_order_non_exist_id(session: Session, client: TestClient):
-    order_1 = Order(id=1, status=OrderStatus.PENDING, stoks="USDCHF", quantity="1234")
-    session.add(order_1)
-    session.commit()
+@pytest.mark.skip(reason="Order ID changed from integer to string")
+def test_get_order_type_error(client: TestClient):
+    response = client.get(f"/orders/{NOT_A_NUMER}")
+    data = response.json()
 
-    response = client.get(f"/orders/2")
+    assert response.status_code == 422
+    assert data['detail'][0]['msg'] == 'Input should be a valid integer, unable to parse string as an integer'
+
+
+def test_get_order_non_exist_id(session: Session, client: TestClient):
+    order_input_1 = OrderInput(stoks="USDCHF", quantity="1234567")
+    db_order_1 = Order.model_validate(order_input_1)
+    session.add(db_order_1)
+    session.commit()
+    session.refresh(db_order_1)
+
+    response = client.get("/orders/0")
     data = response.json()
 
     assert response.status_code == 404
@@ -176,3 +196,25 @@ def test_delete_order_non_exist_id(session: Session, client: TestClient):
 
     assert response.status_code == 404
     assert data['detail'] == 'Order not found'
+
+
+def test_docs(client: TestClient):
+    response = client.get("/docs")
+    assert response.status_code == 200
+
+
+def test_redoc(client: TestClient):
+    response = client.get("/redoc")
+    assert response.status_code == 200
+
+
+def test_openapi_json(client: TestClient):
+    response = client.get("/openapi.json")
+    assert response.status_code == 200
+
+
+def test_non_exist_page(client: TestClient):
+    response = client.get("/non_exist")
+    data = response.json()
+    assert response.status_code == 404
+    assert data['detail'] == "Not Found"

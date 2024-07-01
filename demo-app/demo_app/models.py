@@ -1,6 +1,5 @@
 import uuid
 from enum import Enum
-from typing import Optional
 
 from sqlmodel import SQLModel, Field
 
@@ -17,12 +16,12 @@ class OrderBase(SQLModel):
 
 
 class Order(OrderBase, table=True):
-    id: int | None = Field(default=None, primary_key=True)
+    id: str | None = Field(default_factory=lambda: uuid.uuid4().hex,  primary_key=True)
     status: OrderStatus = Field(default=OrderStatus.PENDING)
 
 
 class OrderPublic(OrderBase):
-    id: int
+    id: str
 
 
 class OrderInput(OrderBase):

@@ -1,3 +1,4 @@
+import asyncio
 import time
 from typing import Sequence
 
@@ -5,6 +6,8 @@ from fastapi import FastAPI, HTTPException, Depends, Query, WebSocket, WebSocket
 from websockets.exceptions import ConnectionClosed
 from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
 from fastapi.openapi.utils import get_openapi
+from fastapi.responses import HTMLResponse
+
 from starlette import status
 
 from demo_app.utils import get_random_delay
@@ -13,6 +16,28 @@ from demo_app.models import Order, OrderInput, OrderStatus, OrderOutput
 
 from sqlmodel import Session, select
 from contextlib import asynccontextmanager
+
+
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: list[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.remove(websocket)
+
+    async def send_personal_message(self, message: str, websocket: WebSocket):
+        await websocket.send_text(message)
+
+    async def broadcast(self, message: str):
+        for connection in self.active_connections:
+            await connection.send_text(message)
+
+
+manager = ConnectionManager()
 
 
 def delay():
@@ -39,6 +64,52 @@ app = FastAPI(
     redoc_url=None,
     openapi_url=None
 )
+
+html = """
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Orders</title>
+    </head>
+    <body>
+        <h1>Add an Order</h1>
+        <h2>Your ID: <span id="ws-id"></span></h2>
+        <form action="" onsubmit="sendMessage(event)">
+            stoks <input type="text" id="stoks" autocomplete="off"/>
+            quantity <input type="text" id="quantity" autocomplete="off"/>
+            <button>Send</button>
+        </form>
+        <hr>
+        <ul id='messages'>
+        </ul>
+        <script>
+            var client_id = Date.now()
+            document.querySelector("#ws-id").textContent = client_id;
+            var ws = new WebSocket(`ws://127.0.0.1:8080/ws/${client_id}`);
+            ws.onmessage = function(event) {
+                var messages = document.getElementById('messages')
+                var message = document.createElement('li')
+                var content = document.createTextNode(event.data)
+                message.appendChild(content)
+                messages.appendChild(message)
+            };
+            function sendMessage(event) {
+                var stoks = document.getElementById("stoks")
+                var quantity = document.getElementById("quantity")
+                ws.send(JSON.stringify({stoks: stoks.value, quantity: quantity.value}))
+                stoks.value = ''
+                quantity.value = ''
+                event.preventDefault()
+            }
+        </script>
+    </body>
+</html>
+"""
+
+
+@app.get("/")
+async def get():
+    return HTMLResponse(html)
 
 
 # Route to get Swagger documentation
@@ -198,20 +269,16 @@ async def health_check():
     return {"message": "OK"}
 
 
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket, session: Session = Depends(get_session)):
-    # await for connections
-    await websocket.accept()
-
+@app.websocket("/ws/{client_id}")
+async def websocket_endpoint(websocket: WebSocket, client_id: int, session: Session = Depends(get_session)):
+    await manager.connect(websocket)
     try:
-        # send "Connection established" message to client
-        await websocket.send_text("Connection established!")
-
-        # await for messages and send messages
+        await manager.send_personal_message("Connection...", websocket)
         while True:
-            msg = await websocket.receive_json()
-            order = await place_order(session=session, order_input=msg)
-            await websocket.send_text(f"Your message was: ORDER_ID: {order.id}. STATUS: {order.status}'")
-
-    except (WebSocketDisconnect, ConnectionClosed):
-        print("Client disconnected")
+            data = await websocket.receive_json()
+            order = await place_order(session=session, order_input=data)
+            await manager.send_personal_message(f"ORDER_ID: {order.id}. STATUS: {order.status}'", websocket)
+            await manager.broadcast(f"Client #{client_id} says: {data}")
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+        await manager.broadcast(f"Client #{client_id} left the chat")

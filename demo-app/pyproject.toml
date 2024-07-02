@@ -28,6 +28,7 @@ asynctest = "^0.13.0"
 asyncio = "^3.4.3"
 aiohttp = "^3.9.5"
 trio = "^0.25.1"
+pytest-asyncio = "^0.23.7"
 
 [build-system]
 requires = ["poetry-core"]

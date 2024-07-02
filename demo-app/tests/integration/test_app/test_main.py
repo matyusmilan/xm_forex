@@ -1,9 +1,11 @@
 import time
 
+import aiohttp
 import pytest
 from starlette.testclient import TestClient
 from sqlmodel import Session, SQLModel, create_engine
 from sqlmodel.pool import StaticPool
+from httpx import AsyncClient
 
 from demo_app.main import app, get_session
 from demo_app.models import OrderStatus, Order, OrderInput, OrderBase
@@ -33,7 +35,8 @@ def client_fixture(session: Session):
         return session
 
     app.dependency_overrides[get_session] = get_session_override
-    client = TestClient(app)
+    # client = AsyncClient(app=app, base_url="http://test")
+    client = TestClient(app=app)
     yield client
     app.dependency_overrides.clear()
 
@@ -248,3 +251,10 @@ async def test_non_exist_page(client: TestClient):
     data = response.json()
     assert response.status_code == 404
     assert data['detail'] == "Not Found"
+
+
+def test_websocket():
+    client = TestClient(app)
+    with client.websocket_connect("/ws/1234") as websocket:
+        data = websocket.receive_text()
+        assert data == "Connection..."

@@ -1,3 +1,5 @@
+import json
+
 import aiohttp
 import asyncio
 
@@ -9,8 +11,9 @@ async def main():
             async for msg in ws:
                 if msg.type == aiohttp.WSMsgType.TEXT:
                     print(f'SERVER says - {msg.data}')
-                    text = input('Enter a message: ')
-                    await ws.send_str(text)
+                    text = input('PRESS ENTER')
+                    oder_input = {"stoks": "DMKEUR", "quantity": "100"}
+                    await ws.send_json(oder_input)
                 elif msg.type == aiohttp.WSMsgType.ERROR:
                     break
 

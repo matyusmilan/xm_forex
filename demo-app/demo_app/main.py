@@ -1,7 +1,6 @@
 import time
 from typing import Sequence
 
-import uvicorn
 from fastapi import FastAPI, HTTPException, Depends, Query, WebSocket, WebSocketDisconnect
 from websockets.exceptions import ConnectionClosed
 from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
@@ -87,6 +86,15 @@ async def get_orders(
     offset: int = 0,
     limit: int = Query(default=100, le=100),
 ) -> Sequence[Order]:
+    """
+    List of Orders with optional pagination.
+    - **offset**: (optional) Offset of orders in result list. It is non-negative integer (Default: 0)
+    - **limit**: (optional)  Quantity of the currency pair to be traded. It is integer between 0 and 100. (Default: 100)
+    \f
+    :param session: Session.
+    :param offset: Offset of orders in result list.
+    :param limit: Size of the result list.
+    """
     delay()
     orders = session.exec(select(Order).offset(offset).limit(limit)).all()
     return orders
@@ -100,6 +108,13 @@ async def get_orders(
     operation_id="getOrder"
 )
 async def get_order(*, session: Session = Depends(get_session), order_id: str):
+    """
+    Get an Order by id.
+    - **order_id**: generated id of order (UUID).
+    \f
+    :param session: Session.
+    :param order_id: Oid of order (UUID).
+    """
     delay()
     order = session.get(Order, order_id)
     if not order:
@@ -118,7 +133,7 @@ async def place_order(*, session: Session = Depends(get_session), order_input: O
     """
     Create an Order with all the information:
 
-    - **id**: generated id of order (UUID).
+    - **order_id**: generated id of order (UUID).
     - **stoks**: (required) Currency pair symbol (e.g. 'EURUSD').
     - **quantity**: (required)  Quantity of the currency pair to be traded.
     - **status**: Status of the order. One of  [pending, executed, canceled] list.
@@ -151,6 +166,13 @@ async def place_order(*, session: Session = Depends(get_session), order_input: O
     operation_id="cancelOrder"
 )
 async def delete_order(*, session: Session = Depends(get_session), order_id: str):
+    """
+    Cancel an Order. If order with <order_id> is exiting then the status will be CANCELLED.
+    - **order_id**: id of order (UUID).
+    \f
+    :param order_id: id of order (UUID).
+    :param session: Session.
+    """
     delay()
     db_order = session.get(Order, order_id)
     if not db_order:
@@ -170,11 +192,14 @@ async def delete_order(*, session: Session = Depends(get_session), order_id: str
     operation_id="healthCheck"
 )
 async def health_check():
+    """
+    Health check endpoint for maintenance.
+    """
     return {"message": "OK"}
 
 
 @app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
+async def websocket_endpoint(websocket: WebSocket, session: Session = Depends(get_session)):
     # await for connections
     await websocket.accept()
 
@@ -184,13 +209,9 @@ async def websocket_endpoint(websocket: WebSocket):
 
         # await for messages and send messages
         while True:
-            msg = await websocket.receive_text()
-            if msg.lower() == "close":
-                await websocket.close()
-                break
-            else:
-                print(f'CLIENT says - {msg}')
-                await websocket.send_text(f"Your message was: {msg}")
+            msg = await websocket.receive_json()
+            order = await place_order(session=session, order_input=msg)
+            await websocket.send_text(f"Your message was: ORDER_ID: {order.id}. STATUS: {order.status}'")
 
     except (WebSocketDisconnect, ConnectionClosed):
         print("Client disconnected")

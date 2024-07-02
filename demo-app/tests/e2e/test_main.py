@@ -5,7 +5,8 @@ import requests
 import uvicorn
 
 from demo_app.main import app
-from demo_app.models import OrderStatus
+from demo_app.models import OrderStatus, Order
+
 
 HOST = "127.0.0.1"
 PORT = 8080
@@ -166,6 +167,91 @@ class TestApp:
         assert data[1]["stoks"] == order_input_2["stoks"]
         assert data[1]["quantity"] == float(order_input_2["quantity"])
         assert data[1]["id"] is not None
+
+    @pytest.mark.parametrize(
+        "offset, limit, status_code, expected_result",
+        [
+            pytest.param(
+                1,
+                1,
+                200,
+                [1],
+                id="one_element"
+            ),
+            pytest.param(
+                3,
+                1,
+                200,
+                [],
+                id="empty_result"
+            ),
+            pytest.param(
+                1,
+                0,
+                200,
+                [],
+                id="zero_limit"
+            ),
+            pytest.param(
+                1,
+                2,
+                200,
+                [1, 2],
+                id="two_element"
+            ),
+        ],
+    )
+    def test_get_orders_paging(self, app_service, offset, limit, status_code, expected_result):
+        full_result = []
+        order_input_1 = {"stoks": "USDCHF", "quantity": "1.123"}
+        response = requests.post(f"{URL_PREFIX}/orders/", json=order_input_1)
+        order_data = response.json()
+        full_result.append(Order(**order_data))
+        order_input_2 = {"stoks": "HUFEUR", "quantity": "2.345"}
+        response = requests.post(f"{URL_PREFIX}/orders/", json=order_input_2)
+        order_data = response.json()
+        full_result.append(Order(**order_data))
+        order_input_3 = {"stoks": "USDDMK", "quantity": "3.456"}
+        response = requests.post(f"{URL_PREFIX}/orders/", json=order_input_3)
+        order_data = response.json()
+        full_result.append(Order(**order_data))
+
+        response = requests.get(f"{URL_PREFIX}/orders?offset={offset}&limit={limit}")
+        assert response.status_code == status_code
+        data = response.json()
+
+        if not expected_result:
+            assert len(response.json()) == 0
+        else:
+            for i in range(len(data)):
+                result_order = Order(**data[i])
+                input_order = full_result[expected_result[i]]
+                assert result_order == input_order
+
+    @pytest.mark.parametrize(
+        "offset, limit, status_code, error_msg",
+        [
+            pytest.param(
+                "apple",
+                1,
+                422,
+                "Input should be a valid integer, unable to parse string as an integer",
+                id="offset_is_string"
+            ),
+            pytest.param(
+                1,
+                "apple",
+                422,
+                "Input should be a valid integer, unable to parse string as an integer",
+                id="limit_is_string"
+            ),
+        ]
+    )
+    def test_get_orders_paging_invalid_input(self, app_service, offset, limit, status_code, error_msg):
+        response = requests.get(f"{URL_PREFIX}/orders?offset={offset}&limit={limit}")
+        assert response.status_code == status_code
+        data = response.json()
+        assert data['detail'][0]['msg'] == error_msg
 
     def test_delete_order(self, app_service):
         """

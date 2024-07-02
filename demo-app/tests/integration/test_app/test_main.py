@@ -38,7 +38,8 @@ def client_fixture(session: Session):
     app.dependency_overrides.clear()
 
 
-def test_health_check(client: TestClient):
+@pytest.mark.anyio
+async def test_health_check(client: TestClient):
     """
         GIVEN
         WHEN health check endpoint is called with GET method
@@ -49,7 +50,8 @@ def test_health_check(client: TestClient):
     assert response.json() == {"message": "OK"}
 
 
-def test_place_order(client: TestClient, monkeypatch):
+@pytest.mark.anyio
+async def test_place_order(client: TestClient, monkeypatch):
     monkeypatch.setattr("demo_app.main.delay", mock_delay)
     response = client.post("/orders/", json={"stoks": "EURUSD", "quantity": 66.6})
     data = response.json()
@@ -61,7 +63,8 @@ def test_place_order(client: TestClient, monkeypatch):
     assert data["status"] == OrderStatus.EXECUTED
 
 
-def test_place_order_incomplete(client: TestClient, monkeypatch):
+@pytest.mark.anyio
+async def test_place_order_incomplete(client: TestClient, monkeypatch):
     monkeypatch.setattr("demo_app.main.delay", mock_delay)
     response = client.post("/orders/", json={"stoks": "EURUSD"})
     data = response.json()
@@ -86,7 +89,8 @@ def test_place_order_incomplete(client: TestClient, monkeypatch):
         ),
     ],
 )
-def test_place_order_invalid(client: TestClient, stoks, quantity, error_msg, monkeypatch):
+@pytest.mark.anyio
+async def test_place_order_invalid(client: TestClient, stoks, quantity, error_msg, monkeypatch):
     monkeypatch.setattr("demo_app.main.delay", mock_delay)
     response = client.post("/orders/", json={"stoks": stoks, "quantity": quantity})
     assert response.status_code == 422
@@ -94,7 +98,8 @@ def test_place_order_invalid(client: TestClient, stoks, quantity, error_msg, mon
     assert data['detail'][0]['msg'] == error_msg
 
 
-def test_get_orders(session: Session, client: TestClient, monkeypatch):
+@pytest.mark.anyio
+async def test_get_orders(session: Session, client: TestClient, monkeypatch):
     monkeypatch.setattr("demo_app.main.delay", mock_delay)
     order_input_1 = OrderInput(stoks="USDCHF", quantity="1234")
     order_input_2 = OrderInput(stoks="EURGBP", quantity="12.34")
@@ -122,7 +127,8 @@ def test_get_orders(session: Session, client: TestClient, monkeypatch):
     assert data[1]["id"] is not None
 
 
-def test_get_orders_empty(client: TestClient, monkeypatch):
+@pytest.mark.anyio
+async def test_get_orders_empty(client: TestClient, monkeypatch):
     monkeypatch.setattr("demo_app.main.delay", mock_delay)
     response = client.get("/orders/")
     data = response.json()
@@ -131,7 +137,8 @@ def test_get_orders_empty(client: TestClient, monkeypatch):
     assert len(data) == 0
 
 
-def test_get_order(session: Session, client: TestClient, monkeypatch):
+@pytest.mark.anyio
+async def test_get_order(session: Session, client: TestClient, monkeypatch):
     monkeypatch.setattr("demo_app.main.delay", mock_delay)
     order_input_1 = OrderInput(stoks="USDUSD", quantity="0")
     db_order_1 = Order.model_validate(order_input_1)
@@ -150,7 +157,8 @@ def test_get_order(session: Session, client: TestClient, monkeypatch):
     assert data["quantity"] == db_order_1.quantity
 
 
-def test_get_order_empty(client: TestClient, monkeypatch):
+@pytest.mark.anyio
+async def test_get_order_empty(client: TestClient, monkeypatch):
     monkeypatch.setattr("demo_app.main.delay", mock_delay)
     response = client.get(f"/orders/1")
     data = response.json()
@@ -160,7 +168,8 @@ def test_get_order_empty(client: TestClient, monkeypatch):
 
 
 @pytest.mark.skip(reason="Order ID changed from integer to string")
-def test_get_order_type_error(client: TestClient):
+@pytest.mark.anyio
+async def test_get_order_type_error(client: TestClient):
     response = client.get(f"/orders/{NOT_A_NUMER}")
     data = response.json()
 
@@ -168,7 +177,8 @@ def test_get_order_type_error(client: TestClient):
     assert data['detail'][0]['msg'] == 'Input should be a valid integer, unable to parse string as an integer'
 
 
-def test_get_order_non_exist_id(session: Session, client: TestClient, monkeypatch):
+@pytest.mark.anyio
+async def test_get_order_non_exist_id(session: Session, client: TestClient, monkeypatch):
     monkeypatch.setattr("demo_app.main.delay", mock_delay)
     order_input_1 = OrderInput(stoks="USDCHF", quantity="1234567")
     db_order_1 = Order.model_validate(order_input_1)
@@ -183,7 +193,8 @@ def test_get_order_non_exist_id(session: Session, client: TestClient, monkeypatc
     assert data['detail'] == 'Order not found'
 
 
-def test_delete_order(session: Session, client: TestClient, monkeypatch):
+@pytest.mark.anyio
+async def test_delete_order(session: Session, client: TestClient, monkeypatch):
     monkeypatch.setattr("demo_app.main.delay", mock_delay)
     order_1 = Order(id=1, status=OrderStatus.PENDING, stoks="USDCHF", quantity="1234")
     session.add(order_1)
@@ -199,7 +210,8 @@ def test_delete_order(session: Session, client: TestClient, monkeypatch):
     assert order_in_db.stoks == order_1.stoks
 
 
-def test_delete_order_non_exist_id(session: Session, client: TestClient, monkeypatch):
+@pytest.mark.anyio
+async def test_delete_order_non_exist_id(session: Session, client: TestClient, monkeypatch):
     monkeypatch.setattr("demo_app.main.delay", mock_delay)
     order_1 = Order(id=1, status=OrderStatus.PENDING, stoks="USDCHF", quantity="1234")
     session.add(order_1)
@@ -212,22 +224,26 @@ def test_delete_order_non_exist_id(session: Session, client: TestClient, monkeyp
     assert data['detail'] == 'Order not found'
 
 
-def test_docs(client: TestClient):
+@pytest.mark.anyio
+async def test_docs(client: TestClient):
     response = client.get("/docs")
     assert response.status_code == 200
 
 
-def test_redoc(client: TestClient):
+@pytest.mark.anyio
+async def test_redoc(client: TestClient):
     response = client.get("/redoc")
     assert response.status_code == 200
 
 
-def test_openapi_json(client: TestClient):
+@pytest.mark.anyio
+async def test_openapi_json(client: TestClient):
     response = client.get("/openapi.json")
     assert response.status_code == 200
 
 
-def test_non_exist_page(client: TestClient):
+@pytest.mark.anyio
+async def test_non_exist_page(client: TestClient):
     response = client.get("/non_exist")
     data = response.json()
     assert response.status_code == 404

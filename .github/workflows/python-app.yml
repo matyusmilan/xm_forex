@@ -48,17 +48,10 @@ jobs:
           cd demo-app/
           poetry install --no-interaction --no-root --no-ansi
       #----------------------------------------------
-      # install your root project, if required
-      #----------------------------------------------
-      - name: Install project
-        run: |
-          cd demo-app/
-          poetry install --no-interaction --no-ansi
-      #----------------------------------------------
       #              run test suite
       #----------------------------------------------
       - name: Run tests
         run: |
-          source .venv/bin/activate
+          cd demo-app/
           pytest tests/
           coverage report

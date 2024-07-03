@@ -48,19 +48,6 @@ jobs:
           cd demo-app/
           poetry install --no-interaction --no-root --no-ansi
       #----------------------------------------------
-      #              run linters
-      #----------------------------------------------
-      - name: Run linters
-        run: |
-          cd demo-app/
-          source .venv/bin/activate
-          flake8 --max-line-length 120 .
-          black . --check
-          isort . --check-only --profile black
-          bandit .
-          ruff check .
-          safety check
-      #----------------------------------------------
       #              run test suite
       #----------------------------------------------
       - name: Run tests

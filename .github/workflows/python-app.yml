@@ -44,14 +44,16 @@ jobs:
       #----------------------------------------------
       - name: Install dependencies
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --no-root --no-ansi
+        run: |
+          cd demo-app/
+          poetry install --no-interaction --no-root --no-ansi
       #----------------------------------------------
       # install your root project, if required
       #----------------------------------------------
       - name: Install project
         run: |
           cd demo-app/
-          poetry install --no-interaction
+          poetry install --no-interaction --no-ansi
       #----------------------------------------------
       #              run test suite
       #----------------------------------------------

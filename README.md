@@ -88,6 +88,11 @@ docker run -it -p 8080:8000 demo_app:service
 # start test
 docker run --network="host" -it demo_app:test python tests/performance/test_websocket.py
 ```
+
+## GitHub Actions
+Details: .github/workflows/python-app.yml
+
+![frontend.png](images/github_actions.png)
 # Technology
 
 ## API

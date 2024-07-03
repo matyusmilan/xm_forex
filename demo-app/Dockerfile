@@ -29,7 +29,7 @@ RUN apt-get update && apt-get upgrade -y \
 RUN mkdir /demo-app
 WORKDIR /demo-app
 
-COPY ./poetry.lock ./pyproject.toml README.md /demo-app/
+COPY ./poetry.lock ./pyproject.toml /demo-app/
 
 FROM base AS test
 RUN poetry install --no-interaction --no-ansi

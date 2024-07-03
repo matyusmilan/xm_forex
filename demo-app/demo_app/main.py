@@ -1,21 +1,24 @@
-import asyncio
 import time
+from contextlib import asynccontextmanager
 from typing import Sequence
 
-from fastapi import FastAPI, HTTPException, Depends, Query, WebSocket, WebSocketDisconnect
-from websockets.exceptions import ConnectionClosed
-from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
+from fastapi import (
+    Depends,
+    FastAPI,
+    HTTPException,
+    Query,
+    WebSocket,
+    WebSocketDisconnect,
+)
+from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import HTMLResponse
-
+from sqlmodel import Session, select
 from starlette import status
 
+from demo_app.database import create_db_and_tables, drop_all_tables, engine
+from demo_app.models import Order, OrderInput, OrderOutput, OrderStatus
 from demo_app.utils import get_random_delay
-from demo_app.database import engine, create_db_and_tables, drop_all_tables
-from demo_app.models import Order, OrderInput, OrderStatus, OrderOutput
-
-from sqlmodel import Session, select
-from contextlib import asynccontextmanager
 
 
 class ConnectionManager:
@@ -55,14 +58,16 @@ async def lifespan(app: FastAPI):  # pragma: no cover
     yield
     drop_all_tables()
 
+
 app = FastAPI(
     lifespan=lifespan,
     title="Forex Trading Platform API",
-    description='A RESTful API to simulate a Forex trading platform with WebSocket support for real-time order updates.',
-    version=f"1.0.0",
+    description="A RESTful API to simulate a Forex trading platform with "
+    "WebSocket support for real-time order updates.",
+    version="1.0.0",
     docs_url=None,
     redoc_url=None,
-    openapi_url=None
+    openapi_url=None,
 )
 
 html = """
@@ -96,7 +101,11 @@ html = """
             function sendMessage(event) {
                 var stoks = document.getElementById("stoks")
                 var quantity = document.getElementById("quantity")
-                ws.send(JSON.stringify({stoks: stoks.value, quantity: quantity.value}))
+                ws.send(
+                    JSON.stringify(
+                        {stoks: stoks.value, quantity: quantity.value}
+                    )
+                )
                 stoks.value = ''
                 quantity.value = ''
                 event.preventDefault()
@@ -107,36 +116,33 @@ html = """
 """
 
 
+# Route to root - websocket client
 @app.get("/")
-async def get():
+async def get_root():
     return HTMLResponse(html)
 
 
 # Route to get Swagger documentation
-@app.get(
-    path="/docs",
-    include_in_schema=False
-)
+@app.get(path="/docs", include_in_schema=False)
 async def get_swagger_documentation():
     return get_swagger_ui_html(openapi_url="/openapi.json", title="docs")
 
 
 # Route to get Redoc documentation
-@app.get(
-    path="/redoc",
-    include_in_schema=False
-)
+@app.get(path="/redoc", include_in_schema=False)
 async def get_redoc_documentation():
     return get_redoc_html(openapi_url="/openapi.json", title="docs")
 
 
 # Route to get the OpenAPI JSON schema
-@app.get(
-    path="/openapi.json",
-    include_in_schema=False
-)
+@app.get(path="/openapi.json", include_in_schema=False)
 async def openapi():
-    return get_openapi(title=app.title, version=app.version, routes=app.routes, description=app.description)
+    return get_openapi(
+        title=app.title,
+        version=app.version,
+        routes=app.routes,
+        description=app.description,
+    )
 
 
 # Route to getOrders()
@@ -149,7 +155,7 @@ async def openapi():
         200: {
             "description": "A list of orders",
         }
-    }
+    },
 )
 async def get_orders(
     *,
@@ -159,8 +165,10 @@ async def get_orders(
 ) -> Sequence[Order]:
     """
     List of Orders with optional pagination.
-    - **offset**: (optional) Offset of orders in result list. It is non-negative integer (Default: 0)
-    - **limit**: (optional)  Quantity of the currency pair to be traded. It is integer between 0 and 100. (Default: 100)
+    - **offset**: (optional) Offset of orders in result list.
+    It is non-negative integer (Default: 0)
+    - **limit**: (optional)  Quantity of the currency pair to be traded.
+    It is integer between 0 and 100. (Default: 100)
     \f
     :param session: Session.
     :param offset: Offset of orders in result list.
@@ -176,7 +184,7 @@ async def get_orders(
     path="/orders/{order_id}",
     response_model=OrderOutput,
     summary="Retrieve a specific order",
-    operation_id="getOrder"
+    operation_id="getOrder",
 )
 async def get_order(*, session: Session = Depends(get_session), order_id: str):
     """
@@ -198,16 +206,19 @@ async def get_order(*, session: Session = Depends(get_session), order_id: str):
     path="/orders",
     status_code=status.HTTP_201_CREATED,
     summary="Place a new order",
-    operation_id="placeOrder"
+    operation_id="placeOrder",
 )
-async def place_order(*, session: Session = Depends(get_session), order_input: OrderInput):
+async def place_order(
+    *, session: Session = Depends(get_session), order_input: OrderInput
+):
     """
     Create an Order with all the information:
 
     - **order_id**: generated id of order (UUID).
     - **stoks**: (required) Currency pair symbol (e.g. 'EURUSD').
-    - **quantity**: (required)  Quantity of the currency pair to be traded.
-    - **status**: Status of the order. One of  [pending, executed, canceled] list.
+    - **quantity**: (required) Quantity of the currency pair to be traded.
+    - **status**: Status of the order.
+    One of  [pending, executed, canceled] list.
     \f
     :param order_input: Order input.
     :param session: Session.
@@ -234,11 +245,12 @@ async def place_order(*, session: Session = Depends(get_session), order_input: O
     path="/orders/{order_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Cancel an order",
-    operation_id="cancelOrder"
+    operation_id="cancelOrder",
 )
 async def delete_order(*, session: Session = Depends(get_session), order_id: str):
     """
-    Cancel an Order. If order with <order_id> is exiting then the status will be CANCELLED.
+    Cancel an Order.
+    If order with <order_id> is exiting then the status will be CANCELLED.
     - **order_id**: id of order (UUID).
     \f
     :param order_id: id of order (UUID).
@@ -260,7 +272,7 @@ async def delete_order(*, session: Session = Depends(get_session), order_id: str
 @app.get(
     path="/health-check/",
     summary="Health check for the API maintenance",
-    operation_id="healthCheck"
+    operation_id="healthCheck",
 )
 async def health_check():
     """
@@ -270,14 +282,17 @@ async def health_check():
 
 
 @app.websocket("/ws/{client_id}")
-async def websocket_endpoint(websocket: WebSocket, client_id: int, session: Session = Depends(get_session)):
+async def websocket_endpoint(
+    websocket: WebSocket, client_id: int, session: Session = Depends(get_session)
+):
     await manager.connect(websocket)
     try:
         await manager.send_personal_message("Connection...", websocket)
         while True:
             data = await websocket.receive_json()
             order = await place_order(session=session, order_input=data)
-            await manager.send_personal_message(f"ORDER_ID: {order.id}. STATUS: {order.status}'", websocket)
+            message = f"ORDER_ID: {order.id}. STATUS: {order.status}'"
+            await manager.send_personal_message(message, websocket)
             await manager.broadcast(f"Client #{client_id} says: {data}")
     except WebSocketDisconnect:
         manager.disconnect(websocket)

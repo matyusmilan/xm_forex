@@ -1,7 +1,7 @@
 import uuid
 from enum import Enum
-from dataclasses import dataclass
-from sqlmodel import SQLModel, Field
+
+from sqlmodel import Field, SQLModel
 
 
 class OrderStatus(str, Enum):
@@ -16,7 +16,7 @@ class OrderBase(SQLModel):
 
 
 class Order(OrderBase, table=True):
-    id: str | None = Field(default_factory=lambda: uuid.uuid4().hex,  primary_key=True)
+    id: str | None = Field(default_factory=lambda: uuid.uuid4().hex, primary_key=True)
     status: OrderStatus = Field(default=OrderStatus.PENDING)
 
 

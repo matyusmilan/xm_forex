@@ -1,5 +1,3 @@
-import base64
-import os
 import pytest
 import pytest_html
 from pytest_metadata.plugin import metadata_key

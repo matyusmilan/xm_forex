@@ -1,5 +1,5 @@
 # Summary
-
+A RESTful API to simulate a Forex trading platform with WebSocket support for real-time order updates.
 # Required
 ```commandline
 python --version
@@ -23,6 +23,8 @@ git clone https://github.com/matyusmilan/xm_forex.git
 1.) Start API
 ```commandline
 cd xm_forex/demo-app
+python3.12 -m venv env
+source env/bin/activate
 poetry install
 uvicorn demo_app.main:app --reload --workers 1 --host 0.0.0.0 --port 8080
 ```
@@ -60,17 +62,22 @@ docker build -t demo_app:test --target test .
 ```
 ### Linters
 ```commandline
-docker run -it demo_app:test flake8 .
+docker run -it demo_app:test flake8 --max-line-length 120 .
 docker run -it demo_app:test black . --check
 docker run -it demo_app:test isort . --check-only --profile black
 docker run -it demo_app:test bandit .
-docker run -it demo_app:test ruff .
+docker run -it demo_app:test ruff check .
 docker run -it demo_app:test safety check 
 ```
 
-### Integration
+### Integration + e2e
 ```commandline
 docker run -it demo_app:test pytest --html=tests/reports/report.html --cov=demo_app tests/ -v
+```
+
+### Performance
+```commandline
+docker run --network="host" -it demo_app:test python tests/performance/test_websocket.py
 ```
 # Technology
 

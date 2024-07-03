@@ -53,5 +53,6 @@ jobs:
       - name: Run tests
         run: |
           cd demo-app/
+          source .venv/bin/activate
           pytest tests/
           coverage report

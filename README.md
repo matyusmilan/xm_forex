@@ -43,6 +43,7 @@ docker run -it -p 8080:8000 demo_app:service
 3.) Visit http://127.0.0.1:8080/docs in your favourite browser
 
 4.) Frontend (http://127.0.0.1:8080/)
+
 ![frontend.png](images/frontend.png)
 
 # Testing

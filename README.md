@@ -1,5 +1,6 @@
 # Summary
 A RESTful API to simulate a Forex trading platform with WebSocket support for real-time order updates.
+![docs.png](images/docs.png)
 # Required
 ```commandline
 python --version
@@ -41,6 +42,9 @@ docker run -it -p 8080:8000 demo_app:service
 ```
 3.) Visit http://127.0.0.1:8080/docs in your favourite browser
 
+4.) Frontend (http://127.0.0.1:8080/)
+![frontend.png](images/frontend.png)
+
 # Testing
 
 ## Local
@@ -77,6 +81,10 @@ docker run -it demo_app:test pytest --html=tests/reports/report.html --cov=demo_
 
 ### Performance
 ```commandline
+# run service
+docker run -it -p 8080:8000 demo_app:service
+
+# start test
 docker run --network="host" -it demo_app:test python tests/performance/test_websocket.py
 ```
 # Technology
